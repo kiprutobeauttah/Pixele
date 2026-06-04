@@ -38,7 +38,7 @@ import {
   Check,
 } from "lucide-react"
 
-export default function EditorPage() {
+function EditorPageContent() {
   const searchParams = useSearchParams()
   const projectId = searchParams.get("project")
 
@@ -1456,5 +1456,13 @@ export default function EditorPage() {
         </>
       )}
     </div>
+  )
+}
+
+export default function EditorPage() {
+  return (
+    <Suspense fallback={<div className="flex items-center justify-center h-[calc(100vh-4rem)]">Loading editor...</div>}>
+      <EditorPageContent />
+    </Suspense>
   )
 }
