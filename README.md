@@ -4,10 +4,14 @@ No documentation yet.
 
 ## GUI Screenshots
 
-### Home
+### 1
 
 ![Home](public/pixele1.png)
 
-### Editor
+### 2
 
 ![Editor](public/pixele2.png)
+
+### 3
+
+![Editor](public/pixele3.png)

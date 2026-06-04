@@ -165,6 +165,46 @@ export default function EditorPage() {
 
   // Apply filter presets
   const applyFilter = (filter: string) => {
+    resetAdjustments()
+
+    switch (filter) {
+      case "vintage":
+        setSepia(true)
+        setSaturation(80)
+        setContrast(120)
+        setVignette(30)
+        break
+      case "blackAndWhite":
+        setGrayscale(true)
+        setContrast(120)
+        setBrightness(110)
+        break
+      case "warm":
+        setHue(10)
+        setSaturation(110)
+        setBrightness(105)
+        break
+      case "cool":
+        setHue(-10)
+        setSaturation(90)
+        setBrightness(100)
+        break
+      case "sharp":
+        setSharpness(50)
+        setContrast(110)
+        break
+      case "soft":
+        setBlur(1)
+        setBrightness(105)
+        setContrast(90)
+        break
+      default:
+        break
+    }
+  }
+
+  // Handle file upload
+  const handleFileChange = (e: React.ChangeEvent<HTMLInputElement>) => {
     const file = e.target.files?.[0]
     if (file) {
       const reader = new FileReader()
@@ -190,7 +230,16 @@ export default function EditorPage() {
       reader.readAsDataURL(file)
     }
   }
-
+  // Zoom controls
+  const handleZoom = (direction: "in" | "out" | "reset") => {
+    if (direction === "in") {
+      setZoom((prev) => Math.min(prev + 10, 300))
+    } else if (direction === "out") {
+      setZoom((prev) => Math.max(prev - 10, 50))
+    } else {
+      setZoom(100)
+    }
+  }
   // Reset all adjustments
   const resetAdjustments = () => {
     setRotation(0)
@@ -214,24 +263,12 @@ export default function EditorPage() {
     setCropMode(false)
     setCropRect({ x: 0, y: 0, width: 0, height: 0 })
   }
-  // Zoom controls
-  const handleZoom = (direction: "in" | "out" | "reset") => {
-    if (direction === "in") {
-      setZoom((prev) => Math.min(prev + 10, 300))
-    } else if (direction === "out") {
-      setZoom((prev) => Math.max(prev - 10, 50))
-    } else {
-      setZoom(100)
-    }
-  }
 
   // Right-click context menu
   const handleContextMenu = (e: React.MouseEvent<HTMLCanvasElement>) => {
     e.preventDefault()
     setContextMenu({ x: e.clientX, y: e.clientY })
   }
-
-  // Add current state to history
   const addToHistory = () => {
     if (!canvasRef.current) return
 
@@ -249,16 +286,18 @@ export default function EditorPage() {
   // Undo
   const handleUndo = () => {
     if (historyIndex > 0) {
-      setHistoryIndex(historyIndex - 1)
-      setImage(history[historyIndex - 1])
+      const newIndex = historyIndex - 1
+      setHistoryIndex(newIndex)
+      setImage(history[newIndex])
     }
   }
 
   // Redo
   const handleRedo = () => {
     if (historyIndex < history.length - 1) {
-      setHistoryIndex(historyIndex + 1)
-      setImage(history[historyIndex + 1])
+      const newIndex = historyIndex + 1
+      setHistoryIndex(newIndex)
+      setImage(history[newIndex])
     }
   }
 
@@ -590,47 +629,6 @@ export default function EditorPage() {
       console.error("Share error:", error)
     }
   }
-
-  // Apply filter presets
-  const applyFilter = (filter: string) => {
-    resetAdjustments()
-
-    switch (filter) {
-      case "vintage":
-        setSepia(true)
-        setSaturation(80)
-        setContrast(120)
-        setVignette(30)
-        break
-      case "blackAndWhite":
-        setGrayscale(true)
-        setContrast(120)
-        setBrightness(110)
-        break
-      case "warm":
-        setHue(10)
-        setSaturation(110)
-        setBrightness(105)
-        break
-      case "cool":
-        setHue(-10)
-        setSaturation(90)
-        setBrightness(100)
-        break
-      case "sharp":
-        setSharpness(50)
-        setContrast(110)
-        break
-      case "soft":
-        setBlur(1)
-        setBrightness(105)
-        setContrast(90)
-        break
-      default:
-        break
-    }
-  }
-
   // Apply changes and add to history
   const applyChanges = () => {
     if (!canvasRef.current) return
@@ -659,8 +657,9 @@ export default function EditorPage() {
     if (!ctx) return
 
     const container = containerRef.current
-    const containerWidth = container.clientWidth
-    const containerHeight = container.clientHeight
+    // Leave margin for zoom controls and spacing
+    const containerWidth = container.clientWidth - 40
+    const containerHeight = container.clientHeight - 80
 
     const img = imageRef.current
 
@@ -669,8 +668,11 @@ export default function EditorPage() {
     const imgWidth = isRotated ? img.height : img.width
     const imgHeight = isRotated ? img.width : img.height
 
-    // Scale image to fit container
-    const displayScale = Math.min(containerWidth / imgWidth, containerHeight / imgHeight)
+    // Scale image to fit container while maintaining aspect ratio
+    let displayScale = Math.min(containerWidth / imgWidth, containerHeight / imgHeight)
+    
+    // Ensure minimum scale for visibility
+    displayScale = Math.max(displayScale, 0.1)
 
     canvas.width = imgWidth * displayScale
     canvas.height = imgHeight * displayScale
@@ -719,13 +721,13 @@ export default function EditorPage() {
                   <div className="text-center py-6">
                     <div className="cursor-pointer w-full">
                       <Button className="w-full skeu-button" asChild>
-                        <label htmlFor="file-upload-main" className="cursor-pointer block">
+                        <label htmlFor="file-upload-tools" className="cursor-pointer block">
                           <Upload className="h-4 w-4 mr-2 inline" />
                           Upload Image
                         </label>
                       </Button>
                       <input
-                        id="file-upload-main"
+                        id="file-upload-tools"
                         type="file"
                         className="sr-only"
                         accept="image/*"
@@ -1225,7 +1227,7 @@ export default function EditorPage() {
         </div>
 
         {/* Canvas */}
-        <div className="flex-1 bg-muted flex flex-col items-center justify-center overflow-hidden" ref={containerRef}>
+        <div className="flex-1 bg-muted flex flex-col items-center justify-center overflow-auto p-4" ref={containerRef}>
           {image && (
             <div className="absolute top-4 left-1/2 transform -translate-x-1/2 z-20 flex gap-2 bg-background/90 backdrop-blur p-2 rounded-lg border skeu-card">
               <Button variant="ghost" size="sm" onClick={() => handleZoom("out")} title="Zoom Out" className="text-xs">
@@ -1248,27 +1250,30 @@ export default function EditorPage() {
               <h3 className="mt-2 text-sm font-semibold">No image selected</h3>
               <p className="mt-1 text-sm text-muted-foreground">Upload an image to get started</p>
               <div className="mt-6">
-                <label htmlFor="file-upload-main" className="cursor-pointer">
-                  <Button>
+                <Button asChild>
+                  <label htmlFor="file-upload-canvas" className="cursor-pointer">
                     Upload Image
-                    <input
-                      id="file-upload-main"
-                      name="file-upload-main"
-                      type="file"
-                      className="sr-only"
-                      accept="image/*"
-                      onChange={handleFileChange}
-                    />
-                  </Button>
-                </label>
+                  </label>
+                </Button>
+                <input
+                  id="file-upload-canvas"
+                  type="file"
+                  className="sr-only"
+                  accept="image/*"
+                  onChange={handleFileChange}
+                />
               </div>
             </div>
           ) : (
-            <div className="relative">
+            <div className="relative flex items-center justify-center">
               <canvas
                 ref={canvasRef}
-                className="border rounded-lg shadow-md skeu-raised"
-                style={{ transform: `scale(${zoom / 100})`, transformOrigin: 'center' }}
+                className="border rounded-lg shadow-md skeu-raised max-w-full max-h-full"
+                style={{ 
+                  transform: `scale(${zoom / 100})`, 
+                  transformOrigin: 'center',
+                  display: 'block'
+                }}
                 onMouseDown={handleMouseDown}
                 onMouseMove={handleMouseMove}
                 onMouseUp={handleMouseUp}
