@@ -59,6 +59,16 @@ const config = {
         md: "calc(var(--radius) - 2px)",
         sm: "calc(var(--radius) - 4px)",
       },
+      boxShadow: {
+        "skeu-sm": "0 2px 4px rgba(0, 0, 0, 0.15), inset 0 1px 0 rgba(255, 200, 200, 0.8)",
+        "skeu-md": "0 4px 8px rgba(0, 0, 0, 0.15), 0 -2px 4px rgba(255, 200, 200, 0.5) inset, inset 0 1px 2px rgba(255, 200, 200, 0.8)",
+        "skeu-lg": "0 8px 16px rgba(0, 0, 0, 0.2), 0 -4px 8px rgba(255, 200, 200, 0.6) inset, inset 0 2px 4px rgba(255, 200, 200, 0.9)",
+        "skeu-pressed": "inset 0 2px 4px rgba(0, 0, 0, 0.2), inset 0 -1px 0 rgba(255, 200, 200, 0.6)",
+      },
+      backgroundImage: {
+        "skeu-gradient": "linear-gradient(135deg, rgba(255, 255, 255, 0.8) 0%, rgba(255, 255, 255, 0) 100%)",
+        "skeu-glass": "linear-gradient(180deg, rgba(255, 255, 255, 0.25) 0%, rgba(255, 255, 255, 0.05) 100%)",
+      },
       keyframes: {
         "accordion-down": {
           from: { height: "0" },

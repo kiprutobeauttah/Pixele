@@ -4,14 +4,18 @@ import { Inter } from "next/font/google"
 import "./globals.css"
 import { ThemeProvider } from "@/components/theme-provider"
 import { Navigation } from "@/components/navigation"
-import { Footer } from "@/components/footer"
+import { LayoutWrapper } from "@/components/layout-wrapper"
 
 const inter = Inter({ subsets: ["latin"] })
 
 export const metadata: Metadata = {
-  title: "PhotoMaster - Advanced Photo Editing",
-  description: "Professional photo editing tools for everyone",
-    generator: 'v0.dev'
+  title: "Pixele - Photo Editing Tools",
+  description: "Simple and powerful photo editing tools",
+  generator: 'v0.dev',
+  icons: {
+    icon: '/favicon.ico',
+    shortcut: '/favicon.ico',
+  }
 }
 
 export default function RootLayout({
@@ -26,13 +30,10 @@ export default function RootLayout({
           <div className="flex min-h-screen flex-col">
             <Navigation />
             <main className="flex-1">{children}</main>
-            <Footer />
+            <LayoutWrapper />
           </div>
         </ThemeProvider>
       </body>
     </html>
   )
 }
-
-
-import './globals.css'

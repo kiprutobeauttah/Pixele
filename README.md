@@ -6,8 +6,8 @@ No documentation yet.
 
 ### Home
 
-![Home](public/Screenshot%202026-03-08%20144813.png)
+![Home](public/pixele1.png)
 
 ### Editor
 
-![Editor](public/Screenshot%202026-03-08%20144827.png)
+![Editor](public/pixele2.png)

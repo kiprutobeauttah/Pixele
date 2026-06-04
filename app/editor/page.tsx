@@ -3,6 +3,7 @@
 import type React from "react"
 
 import { useState, useRef, useEffect } from "react"
+import { useSearchParams } from "next/navigation"
 import { Tabs, TabsContent, TabsList, TabsTrigger } from "@/components/ui/tabs"
 import { Button } from "@/components/ui/button"
 import { Slider } from "@/components/ui/slider"
@@ -34,9 +35,13 @@ import {
   PanelRight,
   Sliders,
   X,
+  Check,
 } from "lucide-react"
 
 export default function EditorPage() {
+  const searchParams = useSearchParams()
+  const projectId = searchParams.get("project")
+
   // State for the image and canvas
   const [image, setImage] = useState<string | null>(null)
   const [originalImage, setOriginalImage] = useState<string | null>(null)
@@ -46,6 +51,12 @@ export default function EditorPage() {
   const [showLayers, setShowLayers] = useState(true)
   const [showTools, setShowTools] = useState(true)
   const [showExport, setShowExport] = useState(false)
+  const [saveStatus, setSaveStatus] = useState<"idle" | "saving" | "saved">("idle")
+  const [exportFormat, setExportFormat] = useState("png")
+  const [exportQuality, setExportQuality] = useState(90)
+  const [autoSaveEnabled, setAutoSaveEnabled] = useState(true)
+  const [zoom, setZoom] = useState(100)
+  const [contextMenu, setContextMenu] = useState<{ x: number; y: number } | null>(null)
 
   // Canvas and image references
   const canvasRef = useRef<HTMLCanvasElement>(null)
@@ -86,8 +97,74 @@ export default function EditorPage() {
   // Layers state (simplified for demo)
   const [layers, setLayers] = useState([{ id: 1, name: "Background", visible: true, locked: false, active: true }])
 
-  // Handle file upload
-  const handleFileChange = (e: React.ChangeEvent<HTMLInputElement>) => {
+  // Load auto-save preference on mount
+  useEffect(() => {
+    const savedAutoSave = localStorage.getItem("pixele-autosave")
+    if (savedAutoSave !== null) {
+      setAutoSaveEnabled(JSON.parse(savedAutoSave))
+    }
+  }, [])
+
+  // Load project from cache on mount
+  useEffect(() => {
+    if (projectId) {
+      const savedProjects = localStorage.getItem("pixele-projects")
+      if (savedProjects) {
+        try {
+          const projects = JSON.parse(savedProjects)
+          const project = projects.find((p: any) => p.id === projectId)
+          if (project) {
+            setImage(project.thumbnail)
+            setOriginalImage(project.thumbnail)
+            setHistory([project.thumbnail])
+            setHistoryIndex(0)
+
+            // Load a smaller version for display
+            const img = new Image()
+            img.onload = () => {
+              imageRef.current = img
+              setWidth(img.width)
+              setHeight(img.height)
+            }
+            img.src = project.thumbnail
+          }
+        } catch (error) {
+          console.error("Failed to load project:", error)
+        }
+      }
+    }
+  }, [projectId])
+
+  // Auto-save project edits
+  useEffect(() => {
+    if (!image || !projectId || !autoSaveEnabled) return
+
+    const timer = setTimeout(() => {
+      try {
+        setSaveStatus("saving")
+        const savedProjects = localStorage.getItem("pixele-projects")
+        if (savedProjects) {
+          const projects = JSON.parse(savedProjects)
+          const projectIndex = projects.findIndex((p: any) => p.id === projectId)
+          if (projectIndex !== -1) {
+            projects[projectIndex].thumbnail = image
+            projects[projectIndex].date = new Date().toISOString()
+            localStorage.setItem("pixele-projects", JSON.stringify(projects))
+            setSaveStatus("saved")
+            setTimeout(() => setSaveStatus("idle"), 2000)
+          }
+        }
+      } catch (error) {
+        console.error("Failed to save project:", error)
+        setSaveStatus("idle")
+      }
+    }, 1000)
+
+    return () => clearTimeout(timer)
+  }, [image, projectId, autoSaveEnabled])
+
+  // Apply filter presets
+  const applyFilter = (filter: string) => {
     const file = e.target.files?.[0]
     if (file) {
       const reader = new FileReader()
@@ -136,6 +213,22 @@ export default function EditorPage() {
     setVignette(0)
     setCropMode(false)
     setCropRect({ x: 0, y: 0, width: 0, height: 0 })
+  }
+  // Zoom controls
+  const handleZoom = (direction: "in" | "out" | "reset") => {
+    if (direction === "in") {
+      setZoom((prev) => Math.min(prev + 10, 300))
+    } else if (direction === "out") {
+      setZoom((prev) => Math.max(prev - 10, 50))
+    } else {
+      setZoom(100)
+    }
+  }
+
+  // Right-click context menu
+  const handleContextMenu = (e: React.MouseEvent<HTMLCanvasElement>) => {
+    e.preventDefault()
+    setContextMenu({ x: e.clientX, y: e.clientY })
   }
 
   // Add current state to history
@@ -433,6 +526,71 @@ export default function EditorPage() {
     link.click()
   }
 
+  // Export image with custom format and quality
+  const exportImage = (format: string, quality: number) => {
+    if (!canvasRef.current) return
+
+    const canvas = canvasRef.current
+    let dataUrl: string
+
+    if (format === "png") {
+      dataUrl = canvas.toDataURL("image/png")
+    } else if (format === "jpg") {
+      dataUrl = canvas.toDataURL("image/jpeg", quality / 100)
+    } else if (format === "webp") {
+      dataUrl = canvas.toDataURL("image/webp", quality / 100)
+    } else {
+      dataUrl = canvas.toDataURL()
+    }
+
+    const link = document.createElement("a")
+    link.download = `pixele-edited.${format}`
+    link.href = dataUrl
+    link.click()
+  }
+
+  // Share image
+  const shareImage = async () => {
+    if (!canvasRef.current) return
+
+    try {
+      const canvas = canvasRef.current
+      canvas.toBlob(async (blob) => {
+        if (!blob) return
+
+        // Check if Web Share API is available
+        if (navigator.share) {
+          try {
+            await navigator.share({
+              title: "Pixele Photo",
+              text: "Check out my edited photo!",
+              files: [
+                new File([blob], "pixele-photo.png", { type: "image/png" })
+              ]
+            })
+          } catch (error) {
+            if ((error as Error).name !== "AbortError") {
+              console.error("Share error:", error)
+            }
+          }
+        } else {
+          // Fallback: copy to clipboard
+          try {
+            await navigator.clipboard.write([
+              new ClipboardItem({ "image/png": blob })
+            ])
+            alert("Image copied to clipboard!")
+          } catch (error) {
+            console.error("Clipboard error:", error)
+            alert("Unable to share. Please use export instead.")
+          }
+        }
+      })
+    } catch (error) {
+      console.error("Share error:", error)
+    }
+  }
+
   // Apply filter presets
   const applyFilter = (filter: string) => {
     resetAdjustments()
@@ -546,7 +704,7 @@ export default function EditorPage() {
     <div className="flex h-[calc(100vh-4rem)] overflow-hidden">
       {/* Tools Sidebar */}
       {showTools && (
-        <div className="w-64 border-r bg-card overflow-y-auto">
+        <div className="w-64 border-r skeu-card overflow-y-auto">
           <div className="p-4">
             <h2 className="text-lg font-bold mb-4">Tools</h2>
             <Tabs defaultValue="basic" value={activeTab} onValueChange={setActiveTab}>
@@ -557,27 +715,53 @@ export default function EditorPage() {
               </TabsList>
 
               <div className="mt-4">
-                {!image && activeTab === "basic" && (
+                {!image && (
                   <div className="text-center py-6">
-                    <label htmlFor="file-upload-sidebar" className="cursor-pointer">
-                      <Button>
-                        Upload Image
-                        <input
-                          id="file-upload-sidebar"
-                          name="file-upload-sidebar"
-                          type="file"
-                          className="sr-only"
-                          accept="image/*"
-                          onChange={handleFileChange}
-                        />
+                    <div className="cursor-pointer w-full">
+                      <Button className="w-full skeu-button" asChild>
+                        <label htmlFor="file-upload-main" className="cursor-pointer block">
+                          <Upload className="h-4 w-4 mr-2 inline" />
+                          Upload Image
+                        </label>
                       </Button>
-                    </label>
+                      <input
+                        id="file-upload-main"
+                        type="file"
+                        className="sr-only"
+                        accept="image/*"
+                        onChange={handleFileChange}
+                      />
+                    </div>
                   </div>
                 )}
 
                 {image && (
                   <>
                     <TabsContent value="basic" className="space-y-4 mt-0">
+                      <div>
+                        <h3 className="text-sm font-medium flex items-center">
+                          <Upload className="h-4 w-4 mr-2" />
+                          Image
+                        </h3>
+                        <div className="mt-2">
+                          <Button className="w-full skeu-button" asChild>
+                            <label htmlFor="file-upload-sidebar" className="cursor-pointer block">
+                              <Upload className="h-4 w-4 mr-2 inline" />
+                              Upload Image
+                            </label>
+                          </Button>
+                          <input
+                            id="file-upload-sidebar"
+                            type="file"
+                            className="sr-only"
+                            accept="image/*"
+                            onChange={handleFileChange}
+                          />
+                        </div>
+                      </div>
+
+                      <Separator />
+
                       <div>
                         <h3 className="text-sm font-medium flex items-center">
                           <Crop className="h-4 w-4 mr-2" />
@@ -622,6 +806,25 @@ export default function EditorPage() {
                                   <SelectItem value="16:9">16:9</SelectItem>
                                 </SelectContent>
                               </Select>
+                            </div>
+                          )}
+                          {cropMode && (
+                            <div className="mt-2 flex gap-2">
+                              <Button
+                                variant="outline"
+                                onClick={cancelCrop}
+                                className="w-1/2"
+                                size="sm"
+                              >
+                                Cancel
+                              </Button>
+                              <Button
+                                onClick={applyCrop}
+                                className="w-1/2"
+                                size="sm"
+                              >
+                                Apply
+                              </Button>
                             </div>
                           )}
                         </div>
@@ -953,7 +1156,7 @@ export default function EditorPage() {
       {/* Main Canvas Area */}
       <div className="flex-1 flex flex-col overflow-hidden">
         {/* Toolbar */}
-        <div className="h-12 border-b flex items-center justify-between px-4">
+        <div className="h-12 border-b skeu-card flex items-center justify-between px-4">
           <div className="flex items-center space-x-2">
             <Button variant="ghost" size="icon" onClick={toggleTools} title="Toggle Tools Panel">
               <PanelLeft className="h-4 w-4" />
@@ -981,15 +1184,35 @@ export default function EditorPage() {
             </Button>
           </div>
           <div className="flex items-center space-x-2">
-            <Button variant="ghost" size="sm" onClick={toggleExport} className="text-xs">
+            <Button variant="ghost" size="sm" className="text-xs" onClick={toggleExport} disabled={!image}>
               <Download className="h-4 w-4 mr-1" />
               Export
             </Button>
-            <Button variant="ghost" size="sm" className="text-xs">
-              <Save className="h-4 w-4 mr-1" />
-              Save
+            <Button 
+              variant="ghost" 
+              size="sm" 
+              className="text-xs"
+              disabled={!image || saveStatus !== "idle"}
+              onClick={() => saveImage()}
+            >
+              {saveStatus === "saving" ? (
+                <>
+                  <span className="h-4 w-4 mr-1 inline-block animate-spin">⟳</span>
+                  Saving...
+                </>
+              ) : saveStatus === "saved" ? (
+                <>
+                  <Check className="h-4 w-4 mr-1" />
+                  Saved
+                </>
+              ) : (
+                <>
+                  <Save className="h-4 w-4 mr-1" />
+                  Save
+                </>
+              )}
             </Button>
-            <Button variant="ghost" size="sm" className="text-xs">
+            <Button variant="ghost" size="sm" className="text-xs" onClick={shareImage} disabled={!image}>
               <Share2 className="h-4 w-4 mr-1" />
               Share
             </Button>
@@ -1002,7 +1225,23 @@ export default function EditorPage() {
         </div>
 
         {/* Canvas */}
-        <div className="flex-1 bg-muted flex items-center justify-center overflow-auto" ref={containerRef}>
+        <div className="flex-1 bg-muted flex flex-col items-center justify-center overflow-hidden" ref={containerRef}>
+          {image && (
+            <div className="absolute top-4 left-1/2 transform -translate-x-1/2 z-20 flex gap-2 bg-background/90 backdrop-blur p-2 rounded-lg border skeu-card">
+              <Button variant="ghost" size="sm" onClick={() => handleZoom("out")} title="Zoom Out" className="text-xs">
+                −
+              </Button>
+              <span className="px-4 py-1 text-xs font-medium">{zoom}%</span>
+              <Button variant="ghost" size="sm" onClick={() => handleZoom("in")} title="Zoom In" className="text-xs">
+                +
+              </Button>
+              <div className="w-px bg-border" />
+              <Button variant="ghost" size="sm" onClick={() => handleZoom("reset")} title="Reset Zoom" className="text-xs">
+                Reset
+              </Button>
+            </div>
+          )}
+          <div className="flex-1 flex items-center justify-center w-full overflow-auto">
           {!image ? (
             <div className="text-center">
               <Upload className="mx-auto h-12 w-12 text-muted-foreground" />
@@ -1028,11 +1267,13 @@ export default function EditorPage() {
             <div className="relative">
               <canvas
                 ref={canvasRef}
-                className="border rounded-lg shadow-md"
+                className="border rounded-lg shadow-md skeu-raised"
+                style={{ transform: `scale(${zoom / 100})`, transformOrigin: 'center' }}
                 onMouseDown={handleMouseDown}
                 onMouseMove={handleMouseMove}
                 onMouseUp={handleMouseUp}
                 onMouseLeave={handleMouseUp}
+                onContextMenu={handleContextMenu}
               />
 
               {cropMode && (
@@ -1047,12 +1288,13 @@ export default function EditorPage() {
               )}
             </div>
           )}
+          </div>
         </div>
       </div>
 
       {/* Layers Panel */}
       {showLayers && (
-        <div className="w-64 border-l bg-card overflow-y-auto">
+        <div className="w-64 border-l skeu-card overflow-y-auto">
           <div className="p-4">
             <h2 className="text-lg font-bold mb-4">Layers</h2>
             <div className="space-y-2">
@@ -1089,7 +1331,7 @@ export default function EditorPage() {
 
       {/* Export Panel */}
       {showExport && (
-        <div className="absolute right-0 top-12 w-64 border-l bg-card h-[calc(100vh-4rem-3rem)] z-10">
+        <div className="absolute right-0 top-12 w-64 border-l skeu-card h-[calc(100vh-4rem-3rem)] z-10">
           <div className="p-4">
             <div className="flex items-center justify-between mb-4">
               <h2 className="text-lg font-bold">Export</h2>
@@ -1102,7 +1344,7 @@ export default function EditorPage() {
                 <Label htmlFor="export-format" className="text-sm">
                   Format
                 </Label>
-                <Select defaultValue="png">
+                <Select value={exportFormat} onValueChange={setExportFormat}>
                   <SelectTrigger id="export-format">
                     <SelectValue placeholder="Select format" />
                   </SelectTrigger>
@@ -1115,9 +1357,9 @@ export default function EditorPage() {
               </div>
               <div>
                 <Label htmlFor="export-quality" className="text-sm">
-                  Quality
+                  Quality: {exportQuality}%
                 </Label>
-                <Slider id="export-quality" min={1} max={100} step={1} defaultValue={[90]} className="mt-2" />
+                <Slider id="export-quality" min={1} max={100} step={1} value={[exportQuality]} onValueChange={(value) => setExportQuality(value[0])} className="mt-2" />
               </div>
               <div>
                 <Label htmlFor="export-size" className="text-sm">
@@ -1128,23 +1370,85 @@ export default function EditorPage() {
                     <Label htmlFor="export-width" className="text-xs">
                       Width
                     </Label>
-                    <Input id="export-width" type="number" value={width} className="h-8" />
+                    <Input id="export-width" type="number" value={width} className="h-8" disabled />
                   </div>
                   <div>
                     <Label htmlFor="export-height" className="text-xs">
                       Height
                     </Label>
-                    <Input id="export-height" type="number" value={height} className="h-8" />
+                    <Input id="export-height" type="number" value={height} className="h-8" disabled />
                   </div>
                 </div>
               </div>
-              <Button onClick={saveImage} className="w-full">
+              <Button onClick={() => { exportImage(exportFormat, exportQuality); toggleExport(); }} className="w-full">
                 <Download className="h-4 w-4 mr-2" />
                 Download
               </Button>
             </div>
           </div>
         </div>
+      )}
+
+      {/* Context Menu */}
+      {contextMenu && (
+        <>
+          <div
+            className="fixed inset-0 z-40"
+            onClick={() => setContextMenu(null)}
+            onContextMenu={(e) => {
+              e.preventDefault()
+              setContextMenu(null)
+            }}
+          />
+          <div
+            className="fixed z-50 bg-background border rounded-lg shadow-lg skeu-card py-1"
+            style={{
+              left: `${contextMenu.x}px`,
+              top: `${contextMenu.y}px`,
+            }}
+          >
+            <button
+              onClick={() => {
+                applyChanges()
+                setContextMenu(null)
+              }}
+              className="w-full px-4 py-2 text-sm text-left hover:bg-accent flex items-center gap-2"
+            >
+              <Check className="h-4 w-4" />
+              Apply Changes
+            </button>
+            <button
+              onClick={() => {
+                resetToOriginal()
+                setContextMenu(null)
+              }}
+              className="w-full px-4 py-2 text-sm text-left hover:bg-accent flex items-center gap-2"
+            >
+              <Sliders className="h-4 w-4" />
+              Reset to Original
+            </button>
+            <button
+              onClick={() => {
+                saveImage()
+                setContextMenu(null)
+              }}
+              className="w-full px-4 py-2 text-sm text-left hover:bg-accent flex items-center gap-2"
+            >
+              <Download className="h-4 w-4" />
+              Save Image
+            </button>
+            <div className="border-t my-1" />
+            <button
+              onClick={() => {
+                handleZoom("reset")
+                setContextMenu(null)
+              }}
+              className="w-full px-4 py-2 text-sm text-left hover:bg-accent"
+            >
+              Reset Zoom
+            </button>
+          </div>
+        </>
       )}
     </div>
   )

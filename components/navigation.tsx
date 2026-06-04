@@ -1,25 +1,18 @@
 "use client"
 
 import Link from "next/link"
+import Image from "next/image"
 import { usePathname } from "next/navigation"
 import { useState } from "react"
 import { Button } from "@/components/ui/button"
-import { DropdownMenu, DropdownMenuContent, DropdownMenuItem, DropdownMenuTrigger } from "@/components/ui/dropdown-menu"
 import { Sheet, SheetContent, SheetTrigger } from "@/components/ui/sheet"
 import { cn } from "@/lib/utils"
 import {
   Menu,
   Home,
   Paintbrush,
-  Sparkles,
   FolderOpen,
   FileImage,
-  Compass,
-  BookOpen,
-  CreditCard,
-  HelpCircle,
-  User,
-  ChevronDown,
 } from "lucide-react"
 
 const mainNavItems = [
@@ -34,11 +27,6 @@ const mainNavItems = [
     icon: Paintbrush,
   },
   {
-    title: "AI Studio",
-    href: "/ai",
-    icon: Sparkles,
-  },
-  {
     title: "My Projects",
     href: "/projects",
     icon: FolderOpen,
@@ -47,21 +35,6 @@ const mainNavItems = [
     title: "Templates",
     href: "/templates",
     icon: FileImage,
-  },
-  {
-    title: "Explore",
-    href: "/explore",
-    icon: Compass,
-  },
-  {
-    title: "Blog",
-    href: "/blog",
-    icon: BookOpen,
-  },
-  {
-    title: "Pricing",
-    href: "/pricing",
-    icon: CreditCard,
   },
 ]
 
@@ -82,8 +55,8 @@ export function Navigation() {
             <SheetContent side="left" className="pr-0">
               <div className="px-7">
                 <Link href="/" className="flex items-center gap-2 font-bold" onClick={() => setIsOpen(false)}>
-                  <Paintbrush className="h-5 w-5" />
-                  <span>PhotoMaster</span>
+                  <Image src="/pixele-logo-removebg.png" alt="Pixele" width={32} height={32} style={{ width: "auto", height: "32px" }} />
+                  <span>Pixele</span>
                 </Link>
               </div>
               <nav className="mt-8 flex flex-col gap-4">
@@ -101,24 +74,13 @@ export function Navigation() {
                     {item.title}
                   </Link>
                 ))}
-                <Link
-                  href="/help"
-                  onClick={() => setIsOpen(false)}
-                  className={cn(
-                    "flex items-center gap-2 px-7 py-2 text-muted-foreground hover:text-foreground",
-                    pathname === "/help" && "text-foreground font-medium",
-                  )}
-                >
-                  <HelpCircle className="h-5 w-5" />
-                  Help Center
-                </Link>
               </nav>
             </SheetContent>
           </Sheet>
 
           <Link href="/" className="flex items-center gap-2 font-bold">
-            <Paintbrush className="h-5 w-5" />
-            <span className="hidden md:inline-block">PhotoMaster</span>
+            <Image src="/pixele-logo-removebg.png" alt="Pixele" width={32} height={32} style={{ width: "auto", height: "32px" }} />
+            <span className="hidden md:inline-block">Pixele</span>
           </Link>
 
           <nav className="hidden md:flex items-center gap-6">
@@ -138,32 +100,8 @@ export function Navigation() {
         </div>
 
         <div className="flex items-center gap-2">
-          <DropdownMenu>
-            <DropdownMenuTrigger asChild>
-              <Button variant="ghost" size="sm" className="gap-1">
-                <User className="h-4 w-4" />
-                <span className="hidden sm:inline-block">Account</span>
-                <ChevronDown className="h-4 w-4" />
-              </Button>
-            </DropdownMenuTrigger>
-            <DropdownMenuContent align="end">
-              <DropdownMenuItem asChild>
-                <Link href="/login">Login</Link>
-              </DropdownMenuItem>
-              <DropdownMenuItem asChild>
-                <Link href="/signup">Sign Up</Link>
-              </DropdownMenuItem>
-              <DropdownMenuItem asChild>
-                <Link href="/account/billing">Billing</Link>
-              </DropdownMenuItem>
-              <DropdownMenuItem asChild>
-                <Link href="/help">Help Center</Link>
-              </DropdownMenuItem>
-            </DropdownMenuContent>
-          </DropdownMenu>
-
           <Button size="sm" asChild>
-            <Link href="/editor">Try Editor</Link>
+            <Link href="/editor">Open Editor</Link>
           </Button>
         </div>
       </div>
